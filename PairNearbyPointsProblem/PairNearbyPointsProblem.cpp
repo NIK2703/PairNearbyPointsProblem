@@ -5,6 +5,7 @@
 
 using namespace std;
 
+int* generateIndexMas(int n);
 void glutInit(int argc, char** argv);
 void pointsDisplay();
 
@@ -104,7 +105,9 @@ T* merge_sort(T* mas, int n, int** indexes = NULL) {
 				sorted_indexes[k] = first_half_indexes[i];
 			}
 		}
-		*indexes = sorted_indexes;
+		if (indexes != NULL) {
+			*indexes = sorted_indexes;
+		}
 		return sorted_mas;
 	}
 	else {
@@ -120,6 +123,50 @@ int* generateIndexMas(int n) {
 	return mas;
 }
 
+int* decompose_nearest_points_search(float** points, int n, int** indexes, float* d) {
+	float* sorted_x = merge_sort(points[0], n, &indexes[0]);
+	float* sorted_y = merge_sort(points[1], n, &indexes[1]);
+
+	//выделение 1 части
+	float** Q = new float* [2];
+	Q[0] = new float[n / 2];
+	Q[1] = new float[n / 2];
+	int** Q_indexes = new int* [2];
+	Q_indexes[0] = new int[n / 2];
+	Q_indexes[1] = new int[n / 2];
+	for (int i = 0; i < n / 2; i++) {
+		Q[0][i] = sorted_x[i];
+		Q[1][i] = sorted_y[i];
+		Q_indexes[0][i] = indexes[0][i];
+		Q_indexes[1][i] = indexes[1][i];
+	}
+
+	float Qd = numeric_limits<float>::max();
+	int* Qq = decompose_nearest_points_search(Q, n / 2, Q_indexes, &Qd);
+
+	//выделение 2 части
+	float** R = new float* [2];
+	R[0] = new float[n - n / 2];
+	R[1] = new float[n - n / 2];
+	int** R_indexes = new int* [2];
+	R_indexes[0] = new int[n - n / 2];
+	R_indexes[1] = new int[n - n / 2];
+	for (int i = n / 2, j = 0; i < n; i++, j++) {
+		R[0][j] = sorted_x[i];
+		R[1][j] = sorted_y[i];
+		R_indexes[0][j] = indexes[0][i];
+		R_indexes[1][j] = indexes[1][i];
+	}
+
+	float Rd = numeric_limits<float>::max();
+	int* Rq = decompose_nearest_points_search(R, n - n / 2, R_indexes, &Rd);
+
+	//разделение по y
+	
+
+	return sorted_indexes_x;
+}
+
 float** points = NULL;
 bool* highlited = NULL;
 int n = 0;
@@ -128,17 +175,13 @@ int main(int argc, char** argv)
 {
 	n = 10;
 	points = generate_points(n);
-	int* indexes = generateIndexMas(n);
-
-	float* sorted_x = merge_sort(points[0], n, &indexes);
-	print_mas(sorted_x, n);
-	print_mas(indexes, n);
-
+	
 	highlited = new bool[n];
 	for (int i = 0; i < n; i++) {
 		highlited[i] = false;
 	}
-	int* nearest_indexes = simple_nearest_points_search(points, n);
+	//int* nearest_indexes = simple_nearest_points_search(points, n);
+	int* nearest_indexes = decompose_nearest_points_search(points, n);
 	highlited[nearest_indexes[0]] = true;
 	highlited[nearest_indexes[1]] = true;
 
