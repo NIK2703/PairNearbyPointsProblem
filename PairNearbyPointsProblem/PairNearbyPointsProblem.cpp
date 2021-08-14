@@ -124,48 +124,110 @@ int* generateIndexMas(int n) {
 }
 
 int* decompose_nearest_points_search(float** points, int n, int** indexes, float* d) {
-	float* sorted_x = merge_sort(points[0], n, &indexes[0]);
-	float* sorted_y = merge_sort(points[1], n, &indexes[1]);
+	if (n > 2) {
+		float* Px = merge_sort(points[0], n, &indexes[0]);
+		float* Py = merge_sort(points[1], n, &indexes[1]);
 
-	//выделение 1 части
-	float** Q = new float* [2];
-	Q[0] = new float[n / 2];
-	Q[1] = new float[n / 2];
-	int** Q_indexes = new int* [2];
-	Q_indexes[0] = new int[n / 2];
-	Q_indexes[1] = new int[n / 2];
-	for (int i = 0; i < n / 2; i++) {
-		Q[0][i] = sorted_x[i];
-		Q[1][i] = sorted_y[i];
-		Q_indexes[0][i] = indexes[0][i];
-		Q_indexes[1][i] = indexes[1][i];
+		int Q_size = n / 2;
+		//выделение 1 части
+		float** Q = new float* [2];
+		Q[0] = new float[Q_size];
+		Q[1] = new float[Q_size];
+		int** Q_indexes = new int* [2];
+		Q_indexes[0] = new int[Q_size];
+		Q_indexes[1] = new int[Q_size];
+		for (int i = 0; i < Q_size; i++) {
+			Q[0][i] = Px[i];
+			Q[1][i] = Py[i];
+			Q_indexes[0][i] = indexes[0][i];
+			Q_indexes[1][i] = indexes[1][i];
+		}
+
+		float Qd = numeric_limits<float>::max();
+		int* Qq = decompose_nearest_points_search(Q, Q_size, Q_indexes, &Qd);
+
+		int R_size = n - n / 2;
+		//выделение 2 части
+		float** R = new float* [2];
+		R[0] = new float[R_size];
+		R[1] = new float[R_size];
+		int** R_indexes = new int* [2];
+		R_indexes[0] = new int[R_size];
+		R_indexes[1] = new int[R_size];
+		for (int i = Q_size, j = 0; i < n; i++, j++) {
+			R[0][j] = Px[i];
+			R[1][j] = Py[i];
+			R_indexes[0][j] = indexes[0][i];
+			R_indexes[1][j] = indexes[1][i];
+		}
+
+		float Rd = numeric_limits<float>::max();
+		int* Rq = decompose_nearest_points_search(R, R_size, R_indexes, &Rd);
+
+		int* nearest = new int[2];
+		if (Qd < Rd) {
+			*d = Qd;
+			nearest = Qq;
+		}
+		else {
+			*d = Rd;
+			nearest = Rq;
+		}
+
+		int s_min, s_max;
+		for (int i = 0; i < n; i++) {
+			if (Px[i] > Px[Q_size - 1] - *d) {
+				s_min = i; 
+				break;
+			}
+		}
+		for (int i = n - 1; i > 0; i--) {
+			if (Px[i] < Px[Q_size - 1] + *d) {
+				s_max = i;
+				break;
+			}
+		}
+		int s_size = s_max - s_min + 1;
+
+		int* Sy_indexes = new int[s_size];
+		float** Sy = new float*[s_size];
+		for (int i = s_min; i < s_max; i++) {
+			Sy_indexes[i] = indexes[i][1];
+			Sy[i] = points[indexes[0][i]];
+		}
+		merge_sort(Sy[1], s_size, &Sy_indexes);
+
+		for (int i = 0; i < s_size; i++) {
+			for (int j = i; j < i + 15 && j < s_size; j++) {
+				float s_dist = distance(Sy[Sy_indexes[i]], Sy[Sy_indexes[j]]);
+				if (s_dist < *d) {
+					*d = s_dist;
+					nearest[0] = Sy_indexes[i];
+					nearest[1] = Sy_indexes[j];
+				}
+			}
+		}
+		return nearest;
+	}
+	else if (n == 2) {
+		*d = distance(points[0], points[1]);
+		return merge_sort(indexes[0], n);
+	}
+	else {
+		*d = numeric_limits<float>::max();
+		return indexes[0];
 	}
 
-	float Qd = numeric_limits<float>::max();
-	int* Qq = decompose_nearest_points_search(Q, n / 2, Q_indexes, &Qd);
-
-	//выделение 2 части
-	float** R = new float* [2];
-	R[0] = new float[n - n / 2];
-	R[1] = new float[n - n / 2];
-	int** R_indexes = new int* [2];
-	R_indexes[0] = new int[n - n / 2];
-	R_indexes[1] = new int[n - n / 2];
-	for (int i = n / 2, j = 0; i < n; i++, j++) {
-		R[0][j] = sorted_x[i];
-		R[1][j] = sorted_y[i];
-		R_indexes[0][j] = indexes[0][i];
-		R_indexes[1][j] = indexes[1][i];
-	}
-
-	float Rd = numeric_limits<float>::max();
-	int* Rq = decompose_nearest_points_search(R, n - n / 2, R_indexes, &Rd);
-
-	//разделение по y
-	
-
-	return sorted_indexes_x;
 }
+
+int* decompose_nearest_points_search(float** points, int n) {
+	int** indexes = new int*[2];
+	indexes[0] = generateIndexMas(n);
+	indexes[1] = generateIndexMas(n);
+	float d;
+	return decompose_nearest_points_search(points, n, indexes, &d);
+}
+
 
 float** points = NULL;
 bool* highlited = NULL;
@@ -181,6 +243,7 @@ int main(int argc, char** argv)
 		highlited[i] = false;
 	}
 	//int* nearest_indexes = simple_nearest_points_search(points, n);
+	float d;
 	int* nearest_indexes = decompose_nearest_points_search(points, n);
 	highlited[nearest_indexes[0]] = true;
 	highlited[nearest_indexes[1]] = true;
