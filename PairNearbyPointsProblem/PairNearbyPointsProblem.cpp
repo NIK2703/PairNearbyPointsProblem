@@ -148,59 +148,46 @@ int* generateIndexMas(int n) {
 	return mas;
 }
 
-int* decompose_nearest_points_search(float** points, int n, int** indexes, float* d) {
-	cout << "ind" << "\n";
-	print_mas(indexes[0], n);
-	print_mas(indexes[1], n);
-	cout << "\n";
+int transformIndex(int source_index, int* index_list, int n) { //приведение индексов после удаления рёбер из матрицы смежности
+	int new_index;
+	new_index = -1;
+	for (int i = 0; i < n; i++) {
+		if (source_index == index_list[i]) {
+			new_index = i;
+		}
+	}
+	return new_index;
+}
+
+template<class T>
+T* sub_mas(T* mas, int start, int end) { //start включается, end не включается
+	T* s_mas = new T[end - start];
+	for (int i = 0, j = start; j < end; i++, j++) {
+		s_mas[i] = mas[j];
+	}
+	return s_mas;
+}
+
+int* decompose_nearest_points_search(float** points, int n, int** sort_indexes, float* d) {
+	
 	if (n > 2) {
-		float** transp_points = transp_matrix(points, n, 2);
-		float* Px = merge_sort(transp_points[0], n, &indexes[0]);
-		float* Py = merge_sort(transp_points[1], n, &indexes[1]);
-
-		cout << "Px" << "\n";
-		print_mas(indexes[0], n);
-		print_mas(Px, n);
-		cout << "\n";
-
-		cout << "Py" << "\n";
-		print_mas(indexes[1], n);
-		print_mas(Py, n);
-		cout << "\n";
-
 		int Q_size = n / 2;
 		//выделение 1 части
-		float** Q = new float* [Q_size];
 		int** Q_indexes = new int* [2];
-		Q_indexes[0] = new int[Q_size];
-		Q_indexes[1] = new int[Q_size];
-		for (int i = 0; i < Q_size; i++) {
-			Q[i] = new float[2];
-			Q[i][0] = Px[i];
-			Q[i][1] = Py[i];
-			Q_indexes[0][i] = indexes[0][i];
-			Q_indexes[1][i] = indexes[1][i];
-		}
+		Q_indexes[0] = sub_mas(sort_indexes[0], 0, Q_size);
+		Q_indexes[1] = sub_mas(sort_indexes[1], 0, Q_size);
 
 		float Qd = numeric_limits<float>::max();
-		int* Qq = decompose_nearest_points_search(Q, Q_size, Q_indexes, &Qd);
+		int* Qq = decompose_nearest_points_search(points, Q_size, Q_indexes, &Qd);
 
-		int R_size = n - n / 2;
+		int R_size = n - Q_size;
 		//выделение 2 части
-		float** R = new float* [R_size];
 		int** R_indexes = new int* [2];
-		R_indexes[0] = new int[R_size];
-		R_indexes[1] = new int[R_size];
-		for (int i = Q_size, j = 0; i < n; i++, j++) {
-			R[j] = new float[2];
-			R[j][0] = Px[i];
-			R[j][1] = Py[i];
-			R_indexes[0][j] = indexes[0][i];
-			R_indexes[1][j] = indexes[1][i];
-		}
+		R_indexes[0] = sub_mas(sort_indexes[0], Q_size, n);
+		R_indexes[1] = sub_mas(sort_indexes[1], Q_size, n);
 
 		float Rd = numeric_limits<float>::max();
-		int* Rq = decompose_nearest_points_search(R, R_size, R_indexes, &Rd);
+		int* Rq = decompose_nearest_points_search(points, R_size, R_indexes, &Rd);
 
 		int* nearest = new int[2];
 		if (Qd < Rd) {
@@ -212,57 +199,44 @@ int* decompose_nearest_points_search(float** points, int n, int** indexes, float
 			nearest = Rq;
 		}
 
-		
-
-		int s_min, s_max;
+		int s_min = 0, s_max = 0;
 		for (int i = 0; i < n; i++) {
-			if (Px[i] > Px[Q_size - 1] - *d) {
+			if (points[sort_indexes[0][i]][0] > points[sort_indexes[0][Q_size - 1]][0] - *d) {
 				s_min = i; 
 				break;
 			}
 		}
 		for (int i = n - 1; i > 0; i--) {
-			if (Px[i] < Px[Q_size - 1] + *d) {
+			if (points[sort_indexes[0][i]][0] < points[sort_indexes[0][Q_size - 1]][0] + *d) {
 				s_max = i;
 				break;
 			}
 		}
 		int s_size = s_max - s_min;
+		if (s_size > 0) { // <- на случай, если в исходном массиве точек попадутся две с одинаковыми координатами
+			int* Sy_indexes = sub_mas(sort_indexes[1], s_min, s_max);
+			Sy_indexes = merge_sort(Sy_indexes, s_size);
+			for (int i = 0; i < s_size; i++) {
+				for (int j = i + 1; j < i + 15 && j < s_size; j++) {
+					float s_dist = distance(points[Sy_indexes[i]], points[Sy_indexes[j]]);
 
-		int* Sy_indexes = new int[s_size];
-		float** Sy = new float*[s_size];
-		for (int i = s_min; i < s_max; i++) {
-			Sy_indexes[i] = indexes[1][i];
-			Sy[i] = points[indexes[0][i]];
-		}
-		print_matrix(Sy, s_size, 2);
-		Sy = transp_matrix(Sy, s_size, 2);
-		merge_sort(Sy[1], s_size, &Sy_indexes);
-		Sy = transp_matrix(Sy, 2, s_size);
-
-		
-		for (int i = 0; i < s_size; i++) {
-			for (int j = i; j < i + 15 && j < s_size; j++) {
-				float s_dist = distance(Sy[Sy_indexes[i]], Sy[Sy_indexes[j]]);
-				if (s_dist < *d) {
-					*d = s_dist;
-					nearest[0] = Sy_indexes[i];
-					nearest[1] = Sy_indexes[j];
+					if (s_dist < *d) {
+						*d = s_dist;
+						nearest[0] = Sy_indexes[i];
+						nearest[1] = Sy_indexes[j];
+					}
 				}
 			}
 		}
 		return nearest;
 	}
-	else if (n == 2) {
+	else if (n == 2) { 
 		*d = distance(points[0], points[1]);
-		cout << "ind 2" << "\n";
-		print_mas(merge_sort(indexes[0], n), n);
-		cout << "\n";
-		return merge_sort(indexes[0], n);
+		return merge_sort(sort_indexes[0], n);
 	}
 	else {
 		*d = numeric_limits<float>::max();
-		return indexes[0];
+		return sort_indexes[0];
 	}
 
 }
@@ -271,6 +245,9 @@ int* decompose_nearest_points_search(float** points, int n) {
 	int** indexes = new int*[2];
 	indexes[0] = generateIndexMas(n);
 	indexes[1] = generateIndexMas(n);
+	float** transp_points = transp_matrix(points, n, 2);
+	merge_sort(transp_points[0], n, &indexes[0]);
+	merge_sort(transp_points[1], n, &indexes[1]);
 	float d;
 	return decompose_nearest_points_search(points, n, indexes, &d);
 }
@@ -281,13 +258,13 @@ int n = 0;
 
 int main(int argc, char** argv)
 {
-	n = 4;
-	//points = generate_points(n);
-	points = new float* [4];
+	n = 120;
+	points = generate_points(n);
+	/*points = new float* [4];
 	points[0] = new float[2]{ 0.5, 0.75 };
 	points[1] = new float[2] { 0, 0 };
 	points[2] = new float[2]{ 0.25, 0.25 };
-	points[3] = new float[2]{ 1, 1 };
+	points[3] = new float[2]{ 1, 1 };*/
 
 	highlited = new bool[n];
 	for (int i = 0; i < n; i++) {
@@ -298,30 +275,15 @@ int main(int argc, char** argv)
 	int* nearest_indexes = decompose_nearest_points_search(points, n);
 	highlited[nearest_indexes[0]] = true;
 	highlited[nearest_indexes[1]] = true;
-	print_mas(nearest_indexes, n);
+	print_mas(nearest_indexes, 2);
 
 	glutInit(argc, argv);
 
 }
 
-//const float aspect_ratio = 1;
-//const int window_x = 640;
-//const int window_y = 640;
-//
-//void changeWindowSize(int x, int y) {
-//	float aspect = x / (float)y;
-//	glMatrixMode(GL_PROJECTION);
-//	glLoadIdentity();
-//	glViewport(0, 0, x, y);
-//	if (aspect > aspect_ratio)  gluOrtho2D(0, window_x * aspect / aspect_ratio, window_y, 0);
-//	if (aspect <= aspect_ratio)  gluOrtho2D(0, window_x, (window_y / aspect) * aspect_ratio, 0);
-//
-//	glMatrixMode(GL_MODELVIEW);
-//
-//}
 
 void pointsDisplay() {
-	glPointSize(5);
+	glPointSize(4);
 
 	glBegin(GL_POINTS);
 	if (points != NULL && highlited != NULL) {
