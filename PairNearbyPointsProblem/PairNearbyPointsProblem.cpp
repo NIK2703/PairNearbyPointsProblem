@@ -2,11 +2,14 @@
 #include <limits>
 #include <glut.h>
 #include <vector>
+#include <fstream>
+#include <time.h>
+#include <string>
 
 using namespace std;
 
 int* generateIndexMas(int n);
-void glutInit(int argc, char** argv);
+void glut_start(int argc, char** argv);
 void pointsDisplay();
 
 const float accuracy = 0.0001;
@@ -256,31 +259,200 @@ float** points = NULL;
 bool* highlited = NULL;
 int n = 0;
 
-int main(int argc, char** argv)
-{
-	n = 120;
-	points = generate_points(n);
-	/*points = new float* [4];
-	points[0] = new float[2]{ 0.5, 0.75 };
-	points[1] = new float[2] { 0, 0 };
-	points[2] = new float[2]{ 0.25, 0.25 };
-	points[3] = new float[2]{ 1, 1 };*/
+int program_menu() {
+	cout << "1 Решение задачи для точек из файла input.txt" << endl;
+	cout << "2 Решение задачи для случайно сгенерированных точек" << endl;
+	cout << "3 Тестирование алгоритмов" << endl;
+	cout << "4 Выход" << endl;
+	cout << endl;
 
-	highlited = new bool[n];
+	int sel = 0;
+	do {
+		cout << "Введите номер пункта меню программы (1-4): ";
+		cin >> sel;
+		cout << endl;
+	} while (!(1 <= sel <= 4));
+
+	return sel;
+}
+
+template <class Type>
+Type** matrix_from_file(string path, int* n) {
+	ifstream in(path);
+	string line;
+	vector<vector<Type>> matrix_lines;
+	if (in.is_open())
+	{
+		while (getline(in, line))
+		{
+			vector<Type> matrix_line;
+			int last_space_pos = 0;
+			int space_pos = line.find('\t', last_space_pos);
+			do
+			{
+				string elem = line.substr(last_space_pos, space_pos != -1 ? space_pos - last_space_pos : line.length());
+				matrix_line.push_back(elem != "-" ?
+					is_same<Type, int>::value ? stoi(elem) :
+					is_same<Type, float>::value ? stof(elem) :
+					numeric_limits<Type>::max() - 100 :
+					numeric_limits<Type>::max() - 100
+				);
+				last_space_pos = space_pos + 1;
+				space_pos = line.find('\t', last_space_pos);
+			} while (last_space_pos != 0);
+			matrix_lines.push_back(matrix_line);
+		}
+		in.close();
+		Type** matrix = new Type * [matrix_lines.size()];
+		for (int i = 0; i < matrix_lines.size(); i++) {
+			matrix[i] = new Type[matrix_lines.at(i).size()];
+			for (int j = 0; j < matrix_lines.at(i).size(); j++) {
+				matrix[i][j] = matrix_lines.at(i).at(j);
+			}
+		}
+		*n = matrix_lines.size();
+		return matrix;
+	}
+	return NULL;
+}
+
+void test_points_from_file(int argc, char** argv) {
+	points = matrix_from_file<float>("input.txt", &n);
+	print_matrix(points, n, 2);
+	cout << endl;
+
+	cout << "Метод грубой силы" << endl;
+
+	float start = clock();
+	int* nearest_points = simple_nearest_points_search(points, n);
+	float end = clock();
+	float seconds = (double)(end - start) / CLOCKS_PER_SEC;
+	
+	cout << "Близжайшие точки: (" << points[nearest_points[0]][0] << ", " << points[nearest_points[0]][1] << ") и ("
+		<< points[nearest_points[1]][0] << ", " << points[nearest_points[1]][1] << ")" << endl;
+	cout << "Расстояние: " << distance(points[nearest_points[0]], points[nearest_points[1]]) << endl ;
+	cout << "Время: " << seconds << " секунд" << endl << endl;
+
+
+	cout << "Метод декомпозиции" << endl;
+
+	start = clock();
+	nearest_points = decompose_nearest_points_search(points, n);
+	end = clock();
+	seconds = (double)(end - start) / CLOCKS_PER_SEC;
+
+	cout << "Близжайшие точки: (" << points[nearest_points[0]][0] << ", " << points[nearest_points[0]][1] << ") и ("
+		<< points[nearest_points[1]][0] << ", " << points[nearest_points[1]][1] << ")" << endl;
+	cout << "Расстояние: " << distance(points[nearest_points[0]], points[nearest_points[1]]) << endl;
+	cout << "Время: " << seconds << " секунд" << endl;
+
+	highlited = new bool[2];
 	for (int i = 0; i < n; i++) {
 		highlited[i] = false;
 	}
-	//int* nearest_indexes = simple_nearest_points_search(points, n);
-	float d;
-	int* nearest_indexes = decompose_nearest_points_search(points, n);
-	highlited[nearest_indexes[0]] = true;
-	highlited[nearest_indexes[1]] = true;
-	print_mas(nearest_indexes, 2);
-
-	glutInit(argc, argv);
+	highlited[nearest_points[0]] = true;
+	highlited[nearest_points[1]] = true;
+	glut_start(argc, argv);
 
 }
 
+void test_generated_points(int argc, char** argv) {
+	points = generate_points(n);
+	cout << "Метод грубой силы" << endl;
+
+	float start = clock();
+	int* nearest_points = simple_nearest_points_search(points, n);
+	float end = clock();
+	float seconds = (double)(end - start) / CLOCKS_PER_SEC;
+
+	cout << "Близжайшие точки: (" << points[nearest_points[0]][0] << ", " << points[nearest_points[0]][1] << ") и ("
+		<< points[nearest_points[1]][0] << ", " << points[nearest_points[1]][1] << ")" << endl;
+	cout << "Расстояние: " << distance(points[nearest_points[0]], points[nearest_points[1]]) << endl;
+	cout << "Время: " << seconds << " секунд" << endl << endl;
+	
+	cout << "Метод декомпозиции" << endl;
+
+	start = clock();
+	nearest_points = decompose_nearest_points_search(points, n);
+	end = clock();
+	seconds = (double)(end - start) / CLOCKS_PER_SEC;
+
+	cout << "Близжайшие точки: (" << points[nearest_points[0]][0] << ", " << points[nearest_points[0]][1] << ") и ("
+		<< points[nearest_points[1]][0] << ", " << points[nearest_points[1]][1] << ")" << endl;
+	cout << "Расстояние: " << distance(points[nearest_points[0]], points[nearest_points[1]]) << endl;
+	cout << "Время: " << seconds << " секунд" << endl;
+
+	highlited = new bool[2];
+	for (int i = 0; i < n; i++) {
+		highlited[i] = false;
+	}
+	highlited[nearest_points[0]] = true;
+	highlited[nearest_points[1]] = true;
+	glut_start(argc, argv);
+
+}
+
+void nearest_points_search_algs_test(int test_number) {
+	clock_t start, end, simple_method_time = 0, decompose_method_time = 0;
+
+	
+	for (int i = 0; i < test_number; i++) {
+		srand(i);
+		points = generate_points(n);
+
+		start = clock();
+		simple_nearest_points_search(points, n);
+		end = clock();
+		simple_method_time += end - start;
+
+		start = clock();
+		decompose_nearest_points_search(points, n);
+		end = clock();
+		decompose_method_time += end - start;
+	}
+	cout << "Средние показатели " << test_number << " тестов для " << n << " точек:" << endl;
+	cout << "Время работы метода грубой силы: " << (double)simple_method_time / CLOCKS_PER_SEC << " seconds" << endl;
+	cout << "Время работы метода декомпозиции: " << (double)decompose_method_time / CLOCKS_PER_SEC << " seconds" << endl;
+}
+
+int main(int argc, char** argv)
+{
+
+	setlocale(LC_ALL, "Russian");
+	int sel = 4;
+	while ((sel = program_menu()) != 4) {
+		switch (sel) {
+		case 1:
+			test_points_from_file(argc, argv);
+			break;
+
+		case 2:
+			cout << "Введите число точек: ";
+			cin >> n;
+			cout << endl;
+			test_generated_points(argc, argv);
+
+			break;
+
+		case 3:
+			cout << "Введите число точек: ";
+			cin >> n;
+			cout << endl;
+			int test_num;
+			cout << "Введите число тестов: ";
+			cin >> test_num;
+			cout << endl;
+			nearest_points_search_algs_test(test_num);
+		
+			break;
+		}
+		cout << endl;
+		system("pause");
+		system("cls");
+	}
+
+	
+}
 
 void pointsDisplay() {
 	glPointSize(4);
@@ -304,12 +476,12 @@ void pointsDisplay() {
 
 }
 
-void glutInit(int argc, char** argv) {
+void glut_start(int argc, char** argv) {
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
 	glutInitWindowSize(640, 640);
 	glutInitWindowPosition(100, 150);
-	glutCreateWindow("Nearest points");
+	glutCreateWindow("Близжайшие точки - метод декомпозиции");
 	//glutReshapeFunc(changeWindowSize);
 
 	glClearColor(1, 1, 1, 0);
